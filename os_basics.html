@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS Fundamentals: The Brain of Your Computer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Three.js for 3D CPU Model -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-text {
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        #cpu-canvas {
+            width: 100%;
+            height: 400px;
+            cursor: grab;
+        }
+        #cpu-canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="bg-white/90 backdrop-blur-md fixed w-full z-50 border-b border-gray-100 dark:bg-gray-900/90 dark:border-gray-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="cpu" class="h-8 w-8 text-blue-600"></i>
+                    <span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white">OS<span class="text-blue-600">xplained</span></span>
+                </div>
+                
+                <div class="flex items-center gap-6">
+                    <div class="hidden md:flex items-center space-x-4">
+                        <a href="#what-is-os" class="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition text-sm">OS Basics</a>
+                        <a href="#cpu-arch" class="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition text-sm">CPU</a>
+                        <a href="#program-vs-process" class="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition text-sm">Process</a>
+                        
+                        <!-- Visualizer Tabs Group -->
+                        <div class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-1 gap-1">
+                            <a href="instruction_cycle.html" target="_blank" class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white dark:hover:bg-gray-700 text-purple-600 dark:text-purple-400 transition shadow-sm">
+                                <i data-lucide="activity" class="h-3 w-3"></i>CPU Cycle
+                            </a>
+                            <a href="scheduling.html" target="_blank" class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400 transition shadow-sm">
+                                <i data-lucide="play" class="h-3 w-3"></i> Scheduling
+                            </a>
+                            <a href="banker_algorithm.html" target="_blank" class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white dark:hover:bg-gray-700 text-green-600 dark:text-green-400 transition shadow-sm">
+                                <i data-lucide="lock" class="h-3 w-3"></i> Banker's algorithm
+                            </a>
+                            <a href="page_replacement.html" target="_blank" class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white dark:hover:bg-gray-700 text-orange-600 dark:text-orange-400 transition shadow-sm">
+                                <i data-lucide="layers" class="h-3 w-3"></i> Page replacement
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none" aria-label="Toggle Dark Mode">
+                        <i id="theme-icon-sun" data-lucide="sun" class="h-5 w-5 text-yellow-500 hidden"></i>
+                        <i id="theme-icon-moon" data-lucide="moon" class="h-5 w-5 text-gray-600 dark:text-gray-300"></i>
+                    </button>
+
+                    <!-- Mobile menu button -->
+                    <div class="md:hidden flex items-center">
+                        <button id="mobile-menu-btn" class="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white focus:outline-none">
+                            <i data-lucide="menu" class="h-6 w-6"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu Panel -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100 dark:bg-gray-900 dark:border-gray-800 shadow-xl">
+            <a href="#what-is-os" class="block px-4 py-3 text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">What is OS?</a>
+            <a href="#cpu-arch" class="block px-4 py-3 text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">The CPU</a>
+            <a href="#program-vs-process" class="block px-4 py-3 text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">Program vs Process</a>
+            <div class="px-4 py-3 space-y-2 border-t border-gray-100 dark:border-gray-800 mt-2 pt-2">
+                <p class="text-xs font-bold text-gray-400 uppercase">Visualizers</p>
+                <a href="instruction_cycle.html" target="_blank" class="block text-purple-600 font-semibold">⚡ CPU Cycle</a>
+                <a href="scheduling.html" target="_blank" class="block text-blue-600 font-semibold">🚀 Scheduler</a>
+                <a href="banker_algorithm.html" target="_blank" class="block text-green-600 font-semibold">🔒 Banker's Algo</a>
+                <a href="page_replacement.html" target="_blank" class="block text-orange-600 font-semibold">📄 Page Replacement</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto text-center">
+            <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 dark:text-white mb-6">
+                Understanding the <span class="gradient-text">Operating System</span>
+            </h1>
+            <p class="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                The invisible manager that turns a pile of metal and silicon into a usable computer. Explore the core concepts of virtualization, processes, and containers.
+            </p>
+            <div class="mt-10 flex justify-center gap-4">
+                <a href="#what-is-os" class="bg-blue-600 text-white px-8 py-3 rounded-full font-medium hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/30">Start Learning</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- What is an OS? -->
+    <section id="what-is-os" class="py-20 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white">What is an Operating System?</h2>
+                <div class="w-20 h-1 bg-blue-600 mx-auto mt-4 rounded-full"></div>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">The OS is the layer between the user/software and the computer hardware.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Card 1 -->
+                <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 card-hover transition-all duration-300">
+                    <div class="bg-blue-100 dark:bg-blue-900/30 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="layout-grid" class="text-blue-600 dark:text-blue-400 h-6 w-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Resource Manager</h3>
+                    <p class="text-gray-600 dark:text-gray-400">It decides who gets to use the CPU, how much RAM they get, and when they can access the disk. It's the traffic cop of your computer.</p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 card-hover transition-all duration-300">
+                    <div class="bg-purple-100 dark:bg-purple-900/30 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="monitor" class="text-purple-600 dark:text-purple-400 h-6 w-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Hardware Abstractor</h3>
+                    <p class="text-gray-600 dark:text-gray-400">It hides the messy details of hardware. You don't need to know how a hard drive motor works to save a file; the OS handles that.</p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 card-hover transition-all duration-300">
+                    <div class="bg-green-100 dark:bg-green-900/30 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="shield-check" class="text-green-600 dark:text-green-400 h-6 w-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Protector</h3>
+                    <p class="text-gray-600 dark:text-gray-400">It ensures that one crashing program doesn't take down the whole system and prevents unauthorized access to files.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- The CPU Architecture Section -->
+    <section id="cpu-arch" class="py-20 bg-white dark:bg-gray-900 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white">The Heart of Operations: The CPU</h2>
+                <div class="w-20 h-1 bg-yellow-500 mx-auto mt-4 rounded-full"></div>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Before virtualization, understanding the physical hardware is key.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <!-- Text Content -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Central Processing Unit</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            The CPU is the "brain" of the computer. It executes instructions fetched from memory (RAM) in a continuous loop known as the <strong>Fetch-Decode-Execute</strong> cycle.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <div class="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded-full">
+                                    <i data-lucide="activity" class="h-6 w-6 text-yellow-600 dark:text-yellow-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">ALU (Arithmetic Logic Unit)</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Performs all mathematical calculations (addition, subtraction) and logical decisions (true/false).</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <div class="bg-red-100 dark:bg-red-900/30 p-2 rounded-full">
+                                    <i data-lucide="command" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Control Unit</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Directs the flow of data within the CPU and between other devices. It's like the conductor of an orchestra.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <div class="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                                    <i data-lucide="hard-drive" class="h-6 w-6 text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Registers</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Tiny, ultra-fast storage locations inside the CPU used to hold data currently being worked on.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3D Model Container -->
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-3xl p-4 border border-gray-200 dark:border-gray-700 shadow-inner flex flex-col items-center">
+                    <div id="cpu-3d-container" class="w-full relative rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                        <!-- Canvas will be injected here -->
+                    </div>
+                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <i data-lucide="mouse-pointer-2" class="h-3 w-3"></i> Interactive 3D Model: Drag to rotate
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Program vs Process -->
+    <section id="program-vs-process" class="py-20 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center gap-12">
+                <div class="md:w-1/2">
+                    <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Program vs. Process</h2>
+                    <p class="text-lg text-gray-600 dark:text-gray-300 mb-6">
+                        A common confusion is treating these two as the same thing. They are related, but distinct states of code.
+                    </p>
+                    
+                    <div class="space-y-6">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <div class="bg-gray-100 dark:bg-gray-800 p-2 rounded-full">
+                                    <i data-lucide="file-code" class="h-6 w-6 text-gray-600 dark:text-gray-300"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">The Program (Passive)</h4>
+                                <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">A program is static code sitting on your hard disk. It's lifeless, like a recipe in a book.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <div class="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                                    <i data-lucide="play-circle" class="h-6 w-6 text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">The Process (Active)</h4>
+                                <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">A process is that program in action. It has memory (RAM), registers, and state. It's the act of cooking the meal.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analogy Visual -->
+                <div class="md:w-1/2 bg-white dark:bg-gray-900 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="font-bold text-gray-800 dark:text-gray-200 mb-6 text-center">The "Kitchen" Analogy</h3>
+                    <div class="flex flex-col gap-4">
+                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border-l-4 border-gray-400 dark:border-gray-500">
+                            <span class="font-medium text-gray-700 dark:text-gray-200">Recipe Book (Disk)</span>
+                            <span class="text-sm bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded-full text-gray-600 dark:text-gray-300">Program</span>
+                        </div>
+                        <div class="flex justify-center">
+                            <i data-lucide="arrow-down" class="text-gray-400 dark:text-gray-500 h-6 w-6"></i>
+                        </div>
+                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border-l-4 border-blue-500">
+                            <span class="font-medium text-gray-700 dark:text-gray-200">The Chef Cooking (CPU + RAM)</span>
+                            <span class="text-sm bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-full text-blue-700 dark:text-blue-300">Process</span>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 italic text-center">
+                            "You can have one recipe (Program) but multiple chefs cooking it at the same time (Processes)."
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CPU Virtualization -->
+    <section id="cpu-virt" class="py-20 bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-16">
+                <h2 class="text-3xl font-bold mb-4">CPU Virtualization</h2>
+                <p class="text-gray-400 text-lg max-w-3xl">How does your computer run 50 apps at once when it only has a few cores?</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-12">
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-blue-400">The Illusion of Multitasking</h3>
+                    <p class="text-gray-300 leading-relaxed mb-6">
+                        The OS creates an illusion that each process has the CPU all to itself. In reality, the OS performs <strong>Time Sharing</strong>. It runs Process A for a tiny slice of time (milliseconds), pauses it, saves its state, runs Process B, pauses it, and so on.
+                    </p>
+                    <p class="text-gray-300 leading-relaxed">
+                        This switching happens so fast that to the human eye, it looks like everything is running simultaneously. This is the basic form of "virtualizing" the CPU resource.
+                    </p>
+                    
+                    <div class="mt-8 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                        <h4 class="font-bold text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="settings" class="h-4 w-4"></i> Context Switch
+                        </h4>
+                        <p class="text-sm text-gray-400">
+                            The mechanism of saving the state of the current process (registers, program counter) and loading the state of the next process. This is pure overhead but necessary for multitasking.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Visualization -->
+                <div class="flex flex-col justify-center space-y-4">
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-green-500 animate-pulse"></div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-mono text-green-400">Process A</span>
+                            <span class="text-xs text-gray-500">Running</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-green-500 w-3/4"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-center text-gray-500 text-sm">
+                        <span>⬇️ Context Switch (OS intervenes) ⬇️</span>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 opacity-50">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-mono text-gray-400">Process B</span>
+                            <span class="text-xs text-gray-500">Waiting</span>
+                        </div>
+                        <div class="h-2 bg-gray-700 rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Containerization -->
+    <section id="containers" class="py-20 bg-white dark:bg-gray-900 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white">Virtual Machines vs. Containerization</h2>
+                <div class="w-20 h-1 bg-indigo-600 mx-auto mt-4 rounded-full"></div>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Modern ways to deploy applications efficiently.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- VM Column -->
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="server" class="h-8 w-8 text-gray-700 dark:text-gray-300"></i>
+                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Virtual Machines (VMs)</h3>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-6">
+                        Traditional virtualization. You use a "Hypervisor" to slice a physical server into smaller "virtual" servers.
+                    </p>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="x-circle" class="h-5 w-5 text-red-500 mt-1"></i>
+                            <span class="text-gray-600 dark:text-gray-300 text-sm"><strong>Heavy:</strong> Each VM runs a full Operating System (Kernel + Apps).</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="x-circle" class="h-5 w-5 text-red-500 mt-1"></i>
+                            <span class="text-gray-600 dark:text-gray-300 text-sm"><strong>Slow Boot:</strong> Takes minutes to start up.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="h-5 w-5 text-green-500 mt-1"></i>
+                            <span class="text-gray-600 dark:text-gray-300 text-sm"><strong>Isolation:</strong> Complete isolation (very secure).</span>
+                        </li>
+                    </ul>
+                    <div class="bg-white dark:bg-gray-900 p-4 rounded border border-gray-300 dark:border-gray-600 text-center text-sm font-mono text-gray-500 dark:text-gray-400">
+                        [App A] [App B]<br>
+                        [Guest OS] [Guest OS]<br>
+                        [ Hypervisor ]<br>
+                        [ Hardware ]
+                    </div>
+                </div>
+
+                <!-- Container Column -->
+                <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-8 border border-indigo-100 dark:border-indigo-900/30 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 -mt-4 -mr-4 bg-indigo-100 dark:bg-indigo-800 w-24 h-24 rounded-full blur-2xl"></div>
+                    <div class="flex items-center gap-3 mb-6 relative z-10">
+                        <i data-lucide="box" class="h-8 w-8 text-indigo-600 dark:text-indigo-400"></i>
+                        <h3 class="text-2xl font-bold text-indigo-900 dark:text-indigo-200">Containerization</h3>
+                    </div>
+                    <p class="text-indigo-800 dark:text-indigo-300 mb-6 relative z-10">
+                        The modern approach (e.g., Docker). Instead of virtualizing the hardware, we virtualize the OS itself.
+                    </p>
+                    <ul class="space-y-3 mb-8 relative z-10">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="h-5 w-5 text-green-600 dark:text-green-400 mt-1"></i>
+                            <span class="text-indigo-800 dark:text-indigo-300 text-sm"><strong>Lightweight:</strong> All containers share the host's Kernel. No extra OS to load.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="h-5 w-5 text-green-600 dark:text-green-400 mt-1"></i>
+                            <span class="text-indigo-800 dark:text-indigo-300 text-sm"><strong>Fast:</strong> Starts in milliseconds.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="h-5 w-5 text-green-600 dark:text-green-400 mt-1"></i>
+                            <span class="text-indigo-800 dark:text-indigo-300 text-sm"><strong>Portable:</strong> "Build once, run anywhere."</span>
+                        </li>
+                    </ul>
+                    <div class="bg-white dark:bg-gray-900 p-4 rounded border border-indigo-200 dark:border-indigo-800 text-center text-sm font-mono text-indigo-900 dark:text-indigo-300 relative z-10">
+                        [App A] [App B]<br>
+                        [ Container Engine ]<br>
+                        [ Host OS Kernel ]<br>
+                        [ Hardware ]
+                    </div>
+                </div>
+            </div>
+
+            <!-- Housing Analogy -->
+            <div class="mt-12 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
+                <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="home" class="h-5 w-5 text-blue-500"></i>
+                    The Real Estate Analogy
+                </h4>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Virtual Machines</span>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Like a <strong>Suburban Housing Development</strong>. Every house has its own plumbing, heating, foundation, and roof. It's totally private, but takes up a lot of space and resources to build.</p>
+                    </div>
+                    <div>
+                        <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Containers</span>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Like an <strong>Apartment Building</strong>. Everyone has their own private room (App), but they all share the same foundation, plumbing, and roof (The Kernel). Much more efficient density.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-12 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="flex justify-center items-center gap-2 mb-4">
+                <i data-lucide="cpu" class="h-6 w-6 text-gray-500"></i>
+                <span class="text-lg font-semibold text-white">OS Basics</span>
+            </div>
+            <p class="text-sm">Created to explain the magic behind the screen.</p>
+            <p class="text-sm">by : aditya anand</p>
+            <p class="text-sm"> paras jain</p>
+
+            <p class="text-xs mt-8 text-gray-600">&copy; 2023 OS Fundamentals. All concepts simplified for educational purposes.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Dark Mode Logic
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('theme-icon-sun');
+        const moonIcon = document.getElementById('theme-icon-moon');
+
+        // Check for saved theme preference or system preference
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            sunIcon.classList.remove('hidden');
+            moonIcon.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            sunIcon.classList.add('hidden');
+            moonIcon.classList.remove('hidden');
+        }
+
+        // Toggle Theme
+        themeToggle.addEventListener('click', () => {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            }
+        });
+
+        // Mobile Menu Toggle logic
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
+        });
+
+        // --- 3D CPU Animation using Three.js ---
+        function initThreeJS() {
+            const container = document.getElementById('cpu-3d-container');
+            if (!container) return; // Guard clause if element doesn't exist yet
+
+            const width = container.clientWidth;
+            const height = 300; // Fixed height for consistency
+
+            // Scene
+            const scene = new THREE.Scene();
+            
+            // --- NEW: Generate a simple environment map for reflections ---
+            // This creates a simulated "studio" environment for realistic reflections
+            const envMapCanvas = document.createElement('canvas');
+            envMapCanvas.width = 256;
+            envMapCanvas.height = 256;
+            const ctx = envMapCanvas.getContext('2d');
+            
+            // Create a gradient that looks like a studio environment (light top, dark bottom)
+            const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+            gradient.addColorStop(0.0, '#ffffff'); // Top light
+            gradient.addColorStop(0.5, '#aaaaaa'); // Horizon gray
+            gradient.addColorStop(1.0, '#333333'); // Bottom dark
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 256, 256);
+            
+            // Add some "lights" to the environment map for better highlights
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(50, 50, 60, 60); // A "softbox" light highlight
+            ctx.fillStyle = '#a0c4ff'; // Subtle blue tint
+            ctx.fillRect(160, 160, 40, 40); // Another light source
+
+            const reflectionTexture = new THREE.CanvasTexture(envMapCanvas);
+            reflectionTexture.mapping = THREE.EquirectangularReflectionMapping;
+            // Apply this environment globally to all MeshStandardMaterials
+            scene.environment = reflectionTexture; 
+
+            // Camera
+            const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+            camera.position.set(0, 4, 6);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.domElement.id = 'cpu-canvas';
+            container.appendChild(renderer.domElement);
+
+            // --- CPU Geometry ---
+            const cpuGroup = new THREE.Group();
+
+            // 1. PCB (Green Board)
+            const pcbGeo = new THREE.BoxGeometry(3.5, 0.1, 3.5);
+            // Classic PCB Green
+            const pcbMat = new THREE.MeshStandardMaterial({ 
+                color: 0x2E7D32, 
+                roughness: 0.7, // Slightly rougher
+                metalness: 0.1, // Less metallic
+                envMapIntensity: 0.5 // Subtle reflection
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            cpuGroup.add(pcb);
+
+            // 2. Silicon Die (Shiny exposed chip in middle)
+            // Laptops often have exposed dies (no heat spreader) or a small heat spreader
+            const dieGeo = new THREE.BoxGeometry(1.2, 0.05, 1.6);
+            // Silicon is shiny, almost glass/mirror-like
+            const dieMat = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, // Slightly lighter black for silicon
+                roughness: 0.02, // Very smooth, almost mirror
+                metalness: 1.0,  // Fully metallic for sharp reflections
+                envMapIntensity: 1.5 // Boost reflections
+            });
+            const die = new THREE.Mesh(dieGeo, dieMat);
+            die.position.y = 0.08; // Sit on top of PCB
+            cpuGroup.add(die);
+            
+            // Secondary small die (common in modern architecture e.g. PCH or cache)
+            const die2Geo = new THREE.BoxGeometry(0.8, 0.05, 0.5);
+            const die2 = new THREE.Mesh(die2Geo, dieMat); // Use same shiny material
+            die2.position.set(0, 0.08, 1.2);
+            cpuGroup.add(die2);
+
+            // 3. BGA Silver Balls (Bottom)
+            // Represents Ball Grid Array solder balls
+            // We use InstancedMesh for performance to render hundreds of balls
+            const ballRadius = 0.07;
+            const ballGeo = new THREE.SphereGeometry(ballRadius, 16, 16);
+            const ballMat = new THREE.MeshStandardMaterial({ 
+                color: 0xE0E0E0, // Bright Silver
+                roughness: 0.2, 
+                metalness: 1.0,
+                envMapIntensity: 1.5 
+            });
+            
+            const gridSize = 14; // 14x14 grid
+            const count = gridSize * gridSize;
+            const bgaMesh = new THREE.InstancedMesh(ballGeo, ballMat, count);
+            
+            const dummy = new THREE.Object3D();
+            let index = 0;
+            const spacing = 0.22; // Spacing between balls
+            const offset = (gridSize * spacing) / 2 - (spacing/2); // Center alignment
+
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    // Create a gap in the middle for realism (common in CPUs)
+                    // Skip if close to center
+                    // const dist = Math.sqrt(Math.pow(i - gridSize/2 + 0.5, 2) + Math.pow(j - gridSize/2 + 0.5, 2));
+                    // if (dist < 2) { index++; continue; } // Optional: Center cutout
+
+                    dummy.position.set(
+                        (i * spacing) - offset,
+                        -0.09, // Position below the PCB
+                        (j * spacing) - offset
+                    );
+                    dummy.updateMatrix();
+                    bgaMesh.setMatrixAt(index++, dummy.matrix);
+                }
+            }
+            
+            cpuGroup.add(bgaMesh);
+
+            // 4. Decoupling Capacitors (Tiny details on top)
+            const capGeo = new THREE.BoxGeometry(0.08, 0.04, 0.15);
+            const capMat = new THREE.MeshStandardMaterial({ 
+                color: 0xBCAAA4, // Ceramic capacitor color
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            
+            // Add a few scattered capacitors around the die
+            const capPos = [
+                {x: 0.8, z: 0}, {x: -0.8, z: 0}, 
+                {x: 0, z: -1.0}, {x: 0.8, z: 0.5},
+                {x: -0.9, z: -0.5}
+            ];
+
+            capPos.forEach(pos => {
+                const cap = new THREE.Mesh(capGeo, capMat);
+                cap.position.set(pos.x, 0.07, pos.z);
+                cpuGroup.add(cap);
+            });
+
+            scene.add(cpuGroup);
+
+            // Lights
+            // Reduce ambient light to let reflections show more
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            // Main key light
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+            
+            // Rim light for edges
+            const rimLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            rimLight.position.set(-5, 5, -5);
+            scene.add(rimLight);
+            
+            // Colored fill light
+            const blueLight = new THREE.PointLight(0x3b82f6, 0.8);
+            blueLight.position.set(-5, 2, 5);
+            scene.add(blueLight);
+
+            // Interaction state
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let autoRotate = true;
+
+            // Events
+            const canvas = renderer.domElement;
+            
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                autoRotate = false;
+            });
+            
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                // Optional: Restart auto-rotate after simple click? 
+                // Let's keep it manual after first interaction
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaMove = {
+                        x: e.offsetX - previousMousePosition.x,
+                        y: e.offsetY - previousMousePosition.y
+                    };
+
+                    const rotateSpeed = 0.005;
+                    cpuGroup.rotation.y += deltaMove.x * rotateSpeed;
+                    cpuGroup.rotation.x += deltaMove.y * rotateSpeed;
+                }
+                previousMousePosition = { x: e.offsetX, y: e.offsetY };
+            });
+
+            // Touch support for mobile
+            canvas.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                autoRotate = false;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }, {passive: false});
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    const currentX = e.touches[0].clientX;
+                    const currentY = e.touches[0].clientY;
+                    
+                    const deltaMove = {
+                        x: currentX - previousMousePosition.x,
+                        y: currentY - previousMousePosition.y
+                    };
+
+                    const rotateSpeed = 0.005;
+                    cpuGroup.rotation.y += deltaMove.x * rotateSpeed;
+                    cpuGroup.rotation.x += deltaMove.y * rotateSpeed;
+                    
+                    previousMousePosition = { x: currentX, y: currentY };
+                    e.preventDefault(); // Prevent scrolling while rotating
+                }
+            }, {passive: false});
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                camera.aspect = newWidth / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newWidth, height);
+            });
+
+            // Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+
+                if (autoRotate) {
+                    cpuGroup.rotation.y += 0.005;
+                    cpuGroup.rotation.z = Math.sin(Date.now() * 0.001) * 0.05; // Slight tilt
+                }
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+        }
+
+        // Run initialization once DOM is ready
+        // Check if container exists, if not wait (though script is at end of body so it should be fine)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initThreeJS);
+        } else {
+            initThreeJS();
+        }
+
+    </script>
+</body>
+</html>

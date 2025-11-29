@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Instruction Cycle Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .component-box {
+            @apply border-2 rounded-xl p-4 transition-all duration-500 shadow-sm relative;
+        }
+        .active-component {
+            @apply border-yellow-500 ring-2 ring-yellow-400/50 bg-yellow-50 dark:bg-yellow-900/20 shadow-lg scale-[1.02] z-10;
+        }
+        
+        /* Smooth fade for values */
+        .value-change {
+            animation: highlight 1s ease-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #fef08a; transform: scale(1.1); }
+            100% { background-color: transparent; transform: scale(1); }
+        }
+        .dark .value-change {
+            animation: highlight-dark 1s ease-out;
+        }
+        @keyframes highlight-dark {
+            0% { background-color: #854d0e; transform: scale(1.1); }
+            100% { background-color: transparent; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-950 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-gray-100 dark:bg-gray-900/90 dark:border-gray-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="activity" class="h-6 w-6 text-purple-600 dark:text-purple-400"></i>
+                    <span class="font-bold text-xl tracking-tight">CPU<span class="text-purple-600 dark:text-purple-400">Cycle</span></span>
+                </div>
+                <div class="flex items-center gap-4">
+                     <a href="os_basics.html" class="text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Back to Tutorial</a>
+                     <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block text-gray-300"></i>
+                        <i data-lucide="moon" class="h-5 w-5 block dark:hidden text-gray-600"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+        
+        <!-- Status Bar (Non-interactive) -->
+        <div class="mb-8 flex justify-center">
+            <div class="flex items-center gap-4 bg-white dark:bg-gray-900 px-6 py-3 rounded-full shadow-sm border border-gray-200 dark:border-gray-800">
+                <div class="flex items-center gap-2">
+                     <span class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Simulation</span>
+                </div>
+                <div class="h-4 w-px bg-gray-300 dark:bg-gray-700"></div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Stage:</span>
+                    <span id="stage-display" class="font-mono font-bold text-purple-600 dark:text-purple-400 transition-all">IDLE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Visualization Grid -->
+        <div class="grid lg:grid-cols-12 gap-6 relative">
+            
+            <!-- Storage (SSD) -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="component-box border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" id="ssd-box">
+                    <div class="flex items-center gap-2 mb-3 text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-800 pb-2">
+                        <i data-lucide="hard-drive" class="h-5 w-5"></i>
+                        <h3 class="font-bold">Storage</h3>
+                    </div>
+                    <div class="space-y-2 text-xs">
+                        <div class="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                            <span class="font-mono text-gray-500 block mb-1">PROGRAM.EXE</span>
+                            <div class="font-mono text-gray-600 dark:text-gray-400">
+                                00: LOAD 10<br>
+                                01: ADD 11<br>
+                                02: STORE 12<br>
+                                03: HALT
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bus Visual -->
+            <div class="hidden lg:block absolute top-[20%] left-[16%] w-[8%] h-1 bg-gray-200 dark:bg-gray-800 z-0"></div>
+            
+            <!-- RAM -->
+            <div class="lg:col-span-3 space-y-4">
+                <div class="component-box border-blue-200 dark:border-blue-900 bg-white dark:bg-gray-900" id="ram-box">
+                    <div class="flex items-center gap-2 mb-3 text-blue-700 dark:text-blue-400 border-b border-gray-100 dark:border-gray-800 pb-2">
+                        <i data-lucide="grid" class="h-5 w-5"></i>
+                        <h3 class="font-bold">RAM (Memory)</h3>
+                    </div>
+                    
+                    <div class="overflow-hidden rounded border border-gray-200 dark:border-gray-700">
+                        <table class="w-full text-xs font-mono">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th class="p-1 text-left text-gray-500">Addr</th>
+                                    <th class="p-1 text-left text-gray-500">Data</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ram-table" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bus Visual -->
+            <div class="hidden lg:block absolute top-[20%] left-[41%] w-[8%] h-1 bg-gray-200 dark:bg-gray-800 z-0" id="ram-cpu-bus"></div>
+
+            <!-- CPU -->
+            <div class="lg:col-span-7 space-y-4">
+                <div class="component-box border-purple-200 dark:border-purple-900 bg-purple-50/50 dark:bg-gray-900/50 p-6" id="cpu-box">
+                    
+                    <div class="grid grid-cols-2 gap-6 mt-4">
+                        
+                        <!-- Control Unit Area -->
+                        <div class="col-span-1 space-y-4">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Control Unit</h4>
+                            
+                            <!-- PC -->
+                            <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 shadow-sm" id="pc-box">
+                                <span class="text-xs font-medium text-gray-500">PC (Counter)</span>
+                                <span class="font-mono font-bold text-lg text-blue-600 dark:text-blue-400" id="pc-val">00</span>
+                            </div>
+
+                            <!-- IR -->
+                            <div class="flex flex-col p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 shadow-sm transition-colors" id="ir-box">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-xs font-medium text-gray-500">IR (Instruction)</span>
+                                    <span class="font-mono font-bold text-lg text-purple-600 dark:text-purple-400" id="ir-val">----</span>
+                                </div>
+                                <div class="text-[10px] text-gray-400 h-4" id="ir-desc">Waiting...</div>
+                            </div>
+                        </div>
+
+                        <!-- Arithmetic Logic Area -->
+                        <div class="col-span-1 space-y-4">
+                             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider text-center">ALU & Data Path</h4>
+                             
+                             <!-- ACC -->
+                             <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 shadow-sm" id="acc-box">
+                                <span class="text-xs font-medium text-gray-500">ACC (Accumulator)</span>
+                                <span class="font-mono font-bold text-lg text-green-600 dark:text-green-400" id="acc-val">0</span>
+                            </div>
+
+                            <!-- ALU Visual -->
+                            <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center min-h-[80px] transition-colors" id="alu-box">
+                                <i data-lucide="calculator" class="h-6 w-6 text-gray-400 mb-1"></i>
+                                <span class="text-xs font-bold text-gray-500">ALU</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pipeline LEDs -->
+                    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-2 justify-center">
+                            <div class="flex flex-col items-center gap-1">
+                                <div class="h-3 w-3 rounded-full bg-gray-300 transition-colors duration-300" id="led-fetch"></div>
+                                <span class="text-[10px] uppercase text-gray-400">Fetch</span>
+                            </div>
+                            <div class="w-12 h-px bg-gray-200 dark:bg-gray-700"></div>
+                            <div class="flex flex-col items-center gap-1">
+                                <div class="h-3 w-3 rounded-full bg-gray-300 transition-colors duration-300" id="led-decode"></div>
+                                <span class="text-[10px] uppercase text-gray-400">Decode</span>
+                            </div>
+                            <div class="w-12 h-px bg-gray-200 dark:bg-gray-700"></div>
+                            <div class="flex flex-col items-center gap-1">
+                                <div class="h-3 w-3 rounded-full bg-gray-300 transition-colors duration-300" id="led-execute"></div>
+                                <span class="text-[10px] uppercase text-gray-400">Execute</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Explanation Footer -->
+        <div class="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl transition-all duration-300 min-h-[80px] flex items-center justify-center text-center">
+            <p class="text-lg font-medium text-blue-800 dark:text-blue-300" id="explanation-text">
+                Initializing System...
+            </p>
+        </div>
+
+    </main>
+
+    <script>
+        // --- Setup ---
+        lucide.createIcons();
+        
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Theme Logic
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        });
+
+        // --- Data ---
+        const RAM_SIZE = 16;
+        let memory = [];
+        
+        function initMemory() {
+            memory = new Array(RAM_SIZE).fill(0);
+            memory[0] = "LOAD 10";
+            memory[1] = "ADD 11";
+            memory[2] = "STORE 12";
+            memory[3] = "HALT";
+            memory[10] = 5;
+            memory[11] = 3;
+            memory[12] = 0;
+        }
+
+        let cpu = {
+            pc: 0,
+            ir: null,
+            acc: 0,
+            state: 'IDLE' 
+        };
+
+        const els = {
+            ramTable: document.getElementById('ram-table'),
+            pcVal: document.getElementById('pc-val'),
+            irVal: document.getElementById('ir-val'),
+            irDesc: document.getElementById('ir-desc'),
+            accVal: document.getElementById('acc-val'),
+            explanation: document.getElementById('explanation-text'),
+            stageDisplay: document.getElementById('stage-display'),
+            ledFetch: document.getElementById('led-fetch'),
+            ledDecode: document.getElementById('led-decode'),
+            ledExecute: document.getElementById('led-execute'),
+            pcBox: document.getElementById('pc-box'),
+            irBox: document.getElementById('ir-box'),
+            ramBox: document.getElementById('ram-box'),
+            accBox: document.getElementById('acc-box'),
+            aluBox: document.getElementById('alu-box')
+        };
+
+        function renderRam() {
+            els.ramTable.innerHTML = '';
+            memory.forEach((val, idx) => {
+                const addr = idx.toString().padStart(2, '0');
+                const row = document.createElement('tr');
+                row.id = `ram-row-${idx}`;
+                row.className = 'transition-colors duration-300';
+                
+                let valClass = (typeof val === 'string') ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-gray-600 dark:text-gray-400';
+
+                row.innerHTML = `
+                    <td class="p-1 border-r border-gray-100 dark:border-gray-800 text-gray-400 font-mono">${addr}</td>
+                    <td class="p-1 ${valClass}">${val}</td>
+                `;
+                els.ramTable.appendChild(row);
+            });
+        }
+
+        function highlightElement(el, active = true) {
+            if (active) el.classList.add('active-component');
+            else el.classList.remove('active-component');
+        }
+        
+        function highlightRamRow(addr, active = true) {
+            const row = document.getElementById(`ram-row-${addr}`);
+            if (!row) return;
+            if (active) row.classList.add('bg-yellow-100', 'dark:bg-yellow-900/40');
+            else row.classList.remove('bg-yellow-100', 'dark:bg-yellow-900/40');
+        }
+
+        function setStageLEDs(stage) {
+            const activeClass = 'bg-green-500 shadow-[0_0_10px_#22c55e]';
+            const inactiveClass = 'bg-gray-300 dark:bg-gray-700';
+            
+            els.ledFetch.className = `h-3 w-3 rounded-full transition-all duration-300 ${stage === 'FETCH' ? activeClass : inactiveClass}`;
+            els.ledDecode.className = `h-3 w-3 rounded-full transition-all duration-300 ${stage === 'DECODE' ? activeClass : inactiveClass}`;
+            els.ledExecute.className = `h-3 w-3 rounded-full transition-all duration-300 ${stage === 'EXECUTE' ? activeClass : inactiveClass}`;
+            
+            els.stageDisplay.innerText = stage;
+        }
+
+        function updateCPUDisplay() {
+            els.pcVal.innerText = cpu.pc.toString().padStart(2, '0');
+            els.irVal.innerText = cpu.ir || "----";
+            els.accVal.innerText = cpu.acc;
+        }
+
+        function clearHighlights() {
+            highlightElement(els.pcBox, false);
+            highlightElement(els.irBox, false);
+            highlightElement(els.ramBox, false);
+            highlightElement(els.accBox, false);
+            highlightElement(els.aluBox, false);
+            for(let i=0; i<RAM_SIZE; i++) highlightRamRow(i, false);
+        }
+
+        // --- Animation Loop ---
+
+        async function runCycle() {
+            // 1. FETCH
+            setStageLEDs('FETCH');
+            clearHighlights();
+            highlightElement(els.pcBox);
+            highlightElement(els.ramBox);
+            highlightRamRow(cpu.pc);
+            
+            const instruction = memory[cpu.pc];
+            cpu.ir = instruction;
+            updateCPUDisplay();
+            els.explanation.innerHTML = `Fetching instruction at address <strong>${cpu.pc}</strong>...`;
+            
+            await wait(1500);
+
+            // 2. DECODE
+            setStageLEDs('DECODE');
+            clearHighlights();
+            highlightElement(els.irBox);
+            cpu.pc++; // Increment PC
+            updateCPUDisplay();
+            
+            const parts = cpu.ir.split(' ');
+            const opcode = parts[0];
+            const operand = parts[1] ? parseInt(parts[1]) : null;
+            
+            let desc = "";
+            if (opcode === "LOAD") desc = "Load memory value into Accumulator";
+            if (opcode === "ADD") desc = "Add memory value to Accumulator";
+            if (opcode === "STORE") desc = "Save Accumulator to memory";
+            if (opcode === "HALT") desc = "Stop execution";
+            
+            els.irDesc.innerText = desc;
+            els.explanation.innerHTML = `Decoding: <strong>${opcode}</strong> ${operand !== null ? operand : ''}`;
+            
+            await wait(1500);
+
+            // 3. EXECUTE
+            setStageLEDs('EXECUTE');
+            clearHighlights();
+            
+            if (opcode === "LOAD") {
+                highlightElement(els.ramBox);
+                highlightElement(els.accBox);
+                highlightRamRow(operand);
+                cpu.acc = memory[operand];
+                els.accVal.classList.add('value-change');
+                setTimeout(() => els.accVal.classList.remove('value-change'), 800);
+                els.explanation.innerHTML = `Loading value <strong>${cpu.acc}</strong> from address ${operand}`;
+                
+            } else if (opcode === "ADD") {
+                highlightElement(els.aluBox);
+                highlightElement(els.accBox);
+                highlightRamRow(operand);
+                const val = memory[operand];
+                cpu.acc += val;
+                els.accVal.classList.add('value-change');
+                setTimeout(() => els.accVal.classList.remove('value-change'), 800);
+                els.explanation.innerHTML = `Adding <strong>${val}</strong> to Accumulator. Result: ${cpu.acc}`;
+                
+            } else if (opcode === "STORE") {
+                highlightElement(els.ramBox);
+                highlightRamRow(operand);
+                memory[operand] = cpu.acc;
+                renderRam();
+                highlightRamRow(operand); // re-highlight after render
+                els.explanation.innerHTML = `Storing value <strong>${cpu.acc}</strong> to address ${operand}`;
+                
+            } else if (opcode === "HALT") {
+                els.explanation.innerHTML = `<span class="text-red-500 font-bold">Program Halted. Rebooting...</span>`;
+                await wait(3000);
+                restart();
+                return;
+            }
+            
+            updateCPUDisplay();
+            await wait(1500);
+            
+            // Loop
+            runCycle();
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function restart() {
+            cpu.pc = 0;
+            cpu.acc = 0;
+            cpu.ir = null;
+            els.irDesc.innerText = "Waiting...";
+            initMemory();
+            renderRam();
+            updateCPUDisplay();
+            runCycle();
+        }
+
+        // Start
+        initMemory();
+        renderRam();
+        updateCPUDisplay();
+        
+        // Slight delay before start
+        setTimeout(runCycle, 1000);
+
+    </script>
+</body>
+</html>

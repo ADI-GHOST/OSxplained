@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Scheduling Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom scrollbar for the gantt chart */
+        .gantt-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .gantt-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .gantt-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .gantt-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-950 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navbar -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-gray-100 dark:bg-gray-900/90 dark:border-gray-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="bar-chart-2" class="h-7 w-7 text-indigo-600 dark:text-indigo-400"></i>
+                    <span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white">Algo<span class="text-indigo-600 dark:text-indigo-400">Viz</span></span>
+                </div>
+                <div class="flex items-center gap-4">
+                     <a href="os_basics.html" class="text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Back to Tutorial</a>
+                     <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block text-gray-300"></i>
+                        <i data-lucide="moon" class="h-5 w-5 block dark:hidden text-gray-600"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+        
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">CPU Scheduling Visualizer</h1>
+            <p class="text-gray-600 dark:text-gray-400">Add processes, select an algorithm, and visualize how the CPU handles tasks.</p>
+        </header>
+
+        <div class="grid lg:grid-cols-3 gap-8">
+            
+            <!-- Input Section (Left Column) -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- Controls Card -->
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="settings" class="h-5 w-5 text-gray-500"></i> Configuration
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Algorithm</label>
+                            <select id="algorithm-select" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="FCFS">First Come First Serve (FCFS)</option>
+                                <option value="SJF">Shortest Job First (SJF) - Non-preemptive</option>
+                                <option value="SRTF">Shortest Remaining Time First (SRTF)</option>
+                                <option value="RR">Round Robin (RR)</option>
+                            </select>
+                        </div>
+
+                        <div id="quantum-container" class="hidden">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time Quantum</label>
+                            <input type="number" id="time-quantum" value="2" min="1" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+
+                        <div class="pt-2">
+                            <button id="visualize-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow transition flex justify-center items-center gap-2">
+                                <i data-lucide="play" class="h-4 w-4"></i> Run Visualization
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process Input Card -->
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="list-plus" class="h-5 w-5 text-gray-500"></i> Process List
+                    </h2>
+                    
+                    <div class="grid grid-cols-3 gap-2 mb-2">
+                        <input type="text" id="pid-input" placeholder="ID (P1)" class="col-span-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm outline-none focus:border-indigo-500 dark:text-white">
+                        <input type="number" id="at-input" placeholder="Arr Time" class="col-span-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm outline-none focus:border-indigo-500 dark:text-white">
+                        <input type="number" id="bt-input" placeholder="Burst" class="col-span-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm outline-none focus:border-indigo-500 dark:text-white">
+                    </div>
+                    <button id="add-process-btn" class="w-full mb-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 py-1.5 rounded text-sm font-medium transition border border-gray-200 dark:border-gray-700">
+                        + Add Process
+                    </button>
+
+                    <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-3 py-2">ID</th>
+                                    <th class="px-3 py-2">AT</th>
+                                    <th class="px-3 py-2">BT</th>
+                                    <th class="px-3 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="process-list-body" class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                                <!-- Process rows go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Output (Right Columns) -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Gantt Chart -->
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 overflow-hidden">
+                    <h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                        <i data-lucide="clock" class="h-5 w-5 text-gray-500"></i> Gantt Chart
+                    </h2>
+                    
+                    <div class="gantt-container overflow-x-auto pb-4">
+                        <div id="gantt-chart" class="flex h-16 min-w-full relative items-center">
+                            <div class="text-gray-400 text-sm italic w-full text-center">Add processes and click run to visualize</div>
+                        </div>
+                        <!-- Time markers -->
+                        <div id="time-ruler" class="flex min-w-full h-6 relative mt-2 text-xs text-gray-500 font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Table -->
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i data-lucide="table" class="h-5 w-5 text-gray-500"></i> Metrics
+                    </h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg">Process ID</th>
+                                    <th class="px-4 py-3">Arrival</th>
+                                    <th class="px-4 py-3">Burst</th>
+                                    <th class="px-4 py-3">Completion</th>
+                                    <th class="px-4 py-3">Turnaround (TAT)</th>
+                                    <th class="px-4 py-3 rounded-r-lg">Waiting (WT)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-body" class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+                                <!-- Stats rows -->
+                            </tbody>
+                            <tfoot id="stats-footer" class="font-bold text-indigo-600 dark:text-indigo-400 bg-gray-50 dark:bg-gray-800/50 hidden">
+                                <tr>
+                                    <td colspan="4" class="px-4 py-3 text-right">Average:</td>
+                                    <td id="avg-tat" class="px-4 py-3">0.00</td>
+                                    <td id="avg-wt" class="px-4 py-3">0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Icons & Theme ---
+        lucide.createIcons();
+
+        const themeToggle = document.getElementById('theme-toggle');
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        });
+
+        // --- Logic ---
+        
+        let processes = [
+            { id: 'P1', at: 0, bt: 5, color: 'bg-red-400' },
+            { id: 'P2', at: 1, bt: 3, color: 'bg-blue-400' },
+            { id: 'P3', at: 2, bt: 8, color: 'bg-green-400' },
+            { id: 'P4', at: 3, bt: 6, color: 'bg-purple-400' }
+        ];
+
+        const colors = [
+            'bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-purple-400', 
+            'bg-yellow-400', 'bg-pink-400', 'bg-indigo-400', 'bg-teal-400'
+        ];
+
+        const algorithmSelect = document.getElementById('algorithm-select');
+        const quantumContainer = document.getElementById('quantum-container');
+        
+        // Show/Hide Quantum input
+        algorithmSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'RR') {
+                quantumContainer.classList.remove('hidden');
+            } else {
+                quantumContainer.classList.add('hidden');
+            }
+        });
+
+        // Add Process
+        const pidInput = document.getElementById('pid-input');
+        const atInput = document.getElementById('at-input');
+        const btInput = document.getElementById('bt-input');
+        
+        document.getElementById('add-process-btn').addEventListener('click', () => {
+            const id = pidInput.value.trim() || `P${processes.length + 1}`;
+            const at = parseInt(atInput.value) || 0;
+            const bt = parseInt(btInput.value);
+
+            if (!bt || bt <= 0) {
+                alert('Burst time must be > 0');
+                return;
+            }
+
+            processes.push({
+                id, at, bt, 
+                color: colors[processes.length % colors.length]
+            });
+            
+            renderProcessList();
+            pidInput.value = '';
+            atInput.value = '';
+            btInput.value = '';
+            // Auto increment default PID for next input
+            pidInput.placeholder = `P${processes.length + 1}`;
+        });
+
+        function deleteProcess(index) {
+            processes.splice(index, 1);
+            renderProcessList();
+        }
+
+        function renderProcessList() {
+            const tbody = document.getElementById('process-list-body');
+            tbody.innerHTML = '';
+            processes.forEach((p, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-3 py-2 flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full ${p.color}"></div>
+                        ${p.id}
+                    </td>
+                    <td class="px-3 py-2 text-gray-600 dark:text-gray-400">${p.at}</td>
+                    <td class="px-3 py-2 text-gray-600 dark:text-gray-400">${p.bt}</td>
+                    <td class="px-3 py-2 text-right">
+                        <button onclick="deleteProcess(${index})" class="text-red-500 hover:text-red-700">
+                            <i data-lucide="trash-2" class="h-4 w-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // --- Scheduler Solvers ---
+
+        function solveFCFS(procs) {
+            // Sort by Arrival Time
+            let sorted = [...procs].sort((a, b) => a.at - b.at);
+            let time = 0;
+            let gantt = [];
+            let completed = [];
+
+            sorted.forEach(p => {
+                if (time < p.at) {
+                    time = p.at; // Idle time skip
+                }
+                const start = time;
+                time += p.bt;
+                const end = time;
+                
+                gantt.push({ id: p.id, start, end, color: p.color });
+                completed.push({
+                    id: p.id, at: p.at, bt: p.bt, 
+                    ct: end, tat: end - p.at, wt: (end - p.at) - p.bt
+                });
+            });
+            return { gantt, completed };
+        }
+
+        function solveSJF(procs) {
+            let pList = procs.map(p => ({...p, completed: false})); // Clone
+            let time = 0;
+            let completedCount = 0;
+            let n = pList.length;
+            let gantt = [];
+            let completedStats = [];
+
+            while(completedCount < n) {
+                // Find eligible processes
+                let eligible = pList.filter(p => !p.completed && p.at <= time);
+                
+                if (eligible.length === 0) {
+                    // Jump to next arrival
+                    let nextArriving = pList.filter(p => !p.completed).sort((a,b) => a.at - b.at)[0];
+                    if(nextArriving) time = nextArriving.at;
+                    continue;
+                }
+
+                // Pick shortest burst
+                eligible.sort((a, b) => a.bt - b.bt || a.at - b.at);
+                let current = eligible[0];
+
+                let start = time;
+                time += current.bt;
+                let end = time;
+
+                current.completed = true;
+                completedCount++;
+                
+                gantt.push({ id: current.id, start, end, color: current.color });
+                completedStats.push({
+                    id: current.id, at: current.at, bt: current.bt,
+                    ct: end, tat: end - current.at, wt: (end - current.at) - current.bt
+                });
+            }
+            return { gantt, completed: completedStats };
+        }
+
+        function solveSRTF(procs) {
+            let pList = procs.map(p => ({...p, remaining: p.bt, completed: false}));
+            let time = 0;
+            let completedCount = 0;
+            let n = pList.length;
+            let gantt = [];
+            let completedStats = [];
+            
+            // We run a simulation step by step. 
+            // Optimization: Skip to next event (arrival or completion)
+            
+            // To properly visualize preemption, we record blocks.
+            // If the same process continues, we extend the block.
+            
+            let lastProcessId = null;
+
+            while (completedCount < n) {
+                // Get eligible
+                let eligible = pList.filter(p => !p.completed && p.at <= time);
+                
+                if (eligible.length === 0) {
+                     // Jump to next arrival
+                     let nextArriving = pList.filter(p => !p.completed).sort((a,b) => a.at - b.at)[0];
+                     if(nextArriving) time = nextArriving.at;
+                     continue;
+                }
+
+                // Pick shortest remaining
+                eligible.sort((a, b) => a.remaining - b.remaining || a.at - b.at);
+                let current = eligible[0];
+
+                // Run for 1 unit
+                if (lastProcessId === current.id) {
+                    // Extend last gantt block
+                    gantt[gantt.length - 1].end++;
+                } else {
+                    // New block
+                    gantt.push({ id: current.id, start: time, end: time + 1, color: current.color });
+                    lastProcessId = current.id;
+                }
+                
+                time++;
+                current.remaining--;
+
+                if (current.remaining === 0) {
+                    current.completed = true;
+                    completedCount++;
+                    completedStats.push({
+                        id: current.id, at: current.at, bt: current.bt,
+                        ct: time, tat: time - current.at, wt: (time - current.at) - current.bt
+                    });
+                    lastProcessId = null; // Force check next choice
+                }
+            }
+            return { gantt, completed: completedStats };
+        }
+
+        function solveRR(procs, quantum) {
+            // Sort by Arrival Time initially
+            let pList = procs.map(p => ({...p, remaining: p.bt}));
+            pList.sort((a, b) => a.at - b.at);
+
+            let time = 0;
+            let queue = [];
+            let gantt = [];
+            let completedStats = [];
+            let completedCount = 0;
+            let n = pList.length;
+            
+            // Helper to add newly arrived processes to queue
+            let pushedIndex = 0;
+            function checkArrivals(currentTime) {
+                while(pushedIndex < n && pList[pushedIndex].at <= currentTime) {
+                    queue.push(pList[pushedIndex]);
+                    pushedIndex++;
+                }
+            }
+
+            // Initial fill
+            // Handling the gap if first process arrives at t > 0
+            if (pList[0].at > 0) {
+                time = pList[0].at;
+            }
+            checkArrivals(time);
+
+            while (completedCount < n) {
+                if (queue.length === 0) {
+                    // Idle jump
+                    if (pushedIndex < n) {
+                        time = pList[pushedIndex].at;
+                        checkArrivals(time);
+                    } else {
+                        break; // Should not happen
+                    }
+                }
+
+                let current = queue.shift();
+                
+                let execTime = Math.min(quantum, current.remaining);
+                let start = time;
+                time += execTime;
+                let end = time;
+
+                gantt.push({ id: current.id, start, end, color: current.color });
+                current.remaining -= execTime;
+
+                // Important: Check for new arrivals BEFORE re-queueing current
+                checkArrivals(time);
+
+                if (current.remaining > 0) {
+                    queue.push(current);
+                } else {
+                    completedCount++;
+                    completedStats.push({
+                        id: current.id, at: current.at, bt: current.bt,
+                        ct: end, tat: end - current.at, wt: (end - current.at) - current.bt
+                    });
+                }
+            }
+            return { gantt, completed: completedStats };
+        }
+
+        // --- Render Logic ---
+
+        document.getElementById('visualize-btn').addEventListener('click', () => {
+            const algo = algorithmSelect.value;
+            const quantum = parseInt(document.getElementById('time-quantum').value);
+            
+            let result;
+            if (algo === 'FCFS') result = solveFCFS(processes);
+            else if (algo === 'SJF') result = solveSJF(processes);
+            else if (algo === 'SRTF') result = solveSRTF(processes);
+            else if (algo === 'RR') result = solveRR(processes, quantum);
+
+            renderGantt(result.gantt);
+            renderStats(result.completed);
+        });
+
+        function renderGantt(data) {
+            const container = document.getElementById('gantt-chart');
+            const ruler = document.getElementById('time-ruler');
+            container.innerHTML = '';
+            ruler.innerHTML = '';
+
+            if (data.length === 0) return;
+
+            // Normalize width
+            // Total duration
+            const totalTime = data[data.length - 1].end;
+            
+            // We want the chart to be scrollable if very long, but fit if short.
+            // Let's use a scale factor: e.g., 40px per 1 unit of time.
+            const scale = 40; 
+            
+            let lastEnd = 0;
+
+            data.forEach(block => {
+                // Gap handling (Idle time)
+                if (block.start > lastEnd) {
+                    const gap = block.start - lastEnd;
+                    const gapDiv = document.createElement('div');
+                    gapDiv.className = 'h-16 flex items-center justify-center bg-gray-100 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700 text-xs text-gray-400';
+                    gapDiv.style.width = `${gap * scale}px`;
+                    gapDiv.innerText = 'Idle';
+                    container.appendChild(gapDiv);
+                }
+
+                const div = document.createElement('div');
+                const width = (block.end - block.start) * scale;
+                div.className = `h-16 flex items-center justify-center text-white font-bold shadow-sm border-r border-white/20 hover:opacity-90 transition relative group ${block.color}`;
+                div.style.width = `${width}px`;
+                div.innerText = block.id;
+                
+                // Tooltip
+                div.innerHTML += `
+                    <div class="absolute bottom-full mb-2 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
+                        ${block.start} - ${block.end}
+                    </div>
+                `;
+
+                container.appendChild(div);
+
+                // Add ruler marker
+                const marker = document.createElement('div');
+                marker.className = 'absolute border-l border-gray-300 dark:border-gray-600 h-2 top-0';
+                marker.style.left = `${block.end * scale}px`;
+                // Only show number if space permits? Just simplistic for now
+                marker.innerHTML = `<span class="absolute -translate-x-1/2 top-3">${block.end}</span>`;
+                ruler.appendChild(marker);
+                
+                // Start marker only for first
+                if (block.start === 0 && lastEnd === 0) {
+                     const startM = document.createElement('div');
+                     startM.className = 'absolute border-l border-gray-300 dark:border-gray-600 h-2 top-0';
+                     startM.style.left = '0px';
+                     startM.innerHTML = `<span class="absolute -translate-x-1/2 top-3">0</span>`;
+                     ruler.appendChild(startM);
+                }
+
+                lastEnd = block.end;
+            });
+            
+            // Adjust container width to make it scrollable
+            container.style.width = `${totalTime * scale}px`;
+            ruler.style.width = `${totalTime * scale}px`;
+        }
+
+        function renderStats(completed) {
+            const tbody = document.getElementById('stats-body');
+            const footer = document.getElementById('stats-footer');
+            tbody.innerHTML = '';
+            
+            if (!completed) return;
+
+            let totalTat = 0;
+            let totalWt = 0;
+
+            // Sort by ID for cleaner table
+            completed.sort((a,b) => a.id.localeCompare(b.id, undefined, {numeric: true}));
+
+            completed.forEach(p => {
+                totalTat += p.tat;
+                totalWt += p.wt;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${p.id}</td>
+                    <td class="px-4 py-3">${p.at}</td>
+                    <td class="px-4 py-3">${p.bt}</td>
+                    <td class="px-4 py-3">${p.ct}</td>
+                    <td class="px-4 py-3">${p.tat}</td>
+                    <td class="px-4 py-3">${p.wt}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('avg-tat').innerText = (totalTat / completed.length).toFixed(2);
+            document.getElementById('avg-wt').innerText = (totalWt / completed.length).toFixed(2);
+            footer.classList.remove('hidden');
+        }
+
+        // Init
+        renderProcessList();
+
+    </script>
+</body>
+</html>

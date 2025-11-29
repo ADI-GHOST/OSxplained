@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banker's Algorithm Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <!-- CHANGED: Added type="text/tailwindcss" to enable @apply -->
+    <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .matrix-input {
+            @apply w-12 text-center bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded py-1 text-sm focus:ring-2 focus:ring-green-500 focus:outline-none transition-all;
+            color-scheme: light dark; /* Ensures spinners match theme */
+        }
+        
+        .process-row {
+            @apply transition-colors duration-300;
+        }
+        .process-row.active-check {
+            @apply bg-yellow-100 dark:bg-yellow-900/30;
+        }
+        .process-row.safe {
+            @apply bg-green-100 dark:bg-green-900/30;
+        }
+        .process-row.unsafe {
+            @apply bg-red-100 dark:bg-red-900/30;
+        }
+        
+        .resource-badge {
+            @apply inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs transition-all duration-500;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-950 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-gray-100 dark:bg-gray-900/90 dark:border-gray-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="lock" class="h-6 w-6 text-green-600 dark:text-green-400"></i>
+                    <span class="font-bold text-xl tracking-tight">Banker's<span class="text-green-600 dark:text-green-400">Viz</span></span>
+                </div>
+                <div class="flex items-center gap-4">
+                     <a href="os_basics.html" class="text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Back to Tutorial</a>
+                     <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block text-gray-300"></i>
+                        <i data-lucide="moon" class="h-5 w-5 block dark:hidden text-gray-600"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+        
+        <!-- Controls Header -->
+        <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Deadlock Avoidance</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Simulate the Banker's Algorithm to find a Safe Sequence.</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="loadExample()" class="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                    <i data-lucide="rotate-ccw" class="h-4 w-4"></i> Reset Example
+                </button>
+                <button onclick="runAlgorithm()" id="run-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-md transition flex items-center gap-2">
+                    <i data-lucide="play" class="h-4 w-4"></i> Run Safety Check
+                </button>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-12 gap-8">
+            
+            <!-- Left Panel: Inputs -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- Initial Available Resources -->
+                <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                        <i data-lucide="box" class="h-4 w-4"></i> Initial Available Resources
+                    </h3>
+                    <div class="flex gap-4 items-center">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold mb-1 text-red-500">A</span>
+                            <input type="number" id="avail-A" class="matrix-input w-16" value="3">
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold mb-1 text-green-500">B</span>
+                            <input type="number" id="avail-B" class="matrix-input w-16" value="3">
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold mb-1 text-blue-500">C</span>
+                            <input type="number" id="avail-C" class="matrix-input w-16" value="2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process Matrix Table -->
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-800 dark:text-gray-200">Process State Matrix</h3>
+                        <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Need = Max - Alloc</span>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">
+                                <tr>
+                                    <th class="p-3 text-left w-16">PID</th>
+                                    <th class="p-3 text-center border-l border-gray-200 dark:border-gray-700" colspan="3">Allocation</th>
+                                    <th class="p-3 text-center border-l border-gray-200 dark:border-gray-700" colspan="3">Max</th>
+                                    <th class="p-3 text-center border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50" colspan="3">Need (Calc)</th>
+                                </tr>
+                                <tr class="text-xs">
+                                    <th></th>
+                                    <!-- Alloc -->
+                                    <th class="pb-2 text-red-500">A</th><th class="pb-2 text-green-500">B</th><th class="pb-2 text-blue-500">C</th>
+                                    <!-- Max -->
+                                    <th class="pb-2 text-red-500 border-l dark:border-gray-700">A</th><th class="pb-2 text-green-500">B</th><th class="pb-2 text-blue-500">C</th>
+                                    <!-- Need -->
+                                    <th class="pb-2 text-red-500 border-l dark:border-gray-700">A</th><th class="pb-2 text-green-500">B</th><th class="pb-2 text-blue-500">C</th>
+                                </tr>
+                            </thead>
+                            <tbody id="matrix-body" class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Visualization -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- Current Status Card -->
+                <div class="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg relative overflow-hidden min-h-[200px]">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-4">Simulation Status</h3>
+                    
+                    <div id="simulation-status" class="space-y-4">
+                        <div class="text-center text-gray-400 py-8">
+                            Ready to start simulation...
+                        </div>
+                    </div>
+
+                    <!-- Visual Representation of "Work" Vector -->
+                    <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <p class="text-xs text-gray-400 mb-2">Current Available Resources (Work Vector):</p>
+                        <div class="flex gap-3 justify-center" id="work-vector-visual">
+                            <!-- Visual Balls -->
+                            <div class="flex flex-col items-center"><div class="resource-badge bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300" id="work-A">3</div><span class="text-[10px] mt-1">A</span></div>
+                            <div class="flex flex-col items-center"><div class="resource-badge bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300" id="work-B">3</div><span class="text-[10px] mt-1">B</span></div>
+                            <div class="flex flex-col items-center"><div class="resource-badge bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" id="work-C">2</div><span class="text-[10px] mt-1">C</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Safe Sequence Result -->
+                <div class="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Safe Sequence</h3>
+                    <div id="safe-sequence-container" class="flex flex-wrap gap-2 min-h-[40px] items-center">
+                        <span class="text-sm text-gray-400 italic" id="safe-seq-placeholder">None yet</span>
+                    </div>
+                    <div id="final-result" class="mt-4 font-bold text-center hidden"></div>
+                </div>
+
+                <!-- Log -->
+                <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 h-64 overflow-y-auto font-mono text-xs">
+                    <div class="text-gray-400 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1">Activity Log</div>
+                    <div id="activity-log" class="space-y-1 text-gray-600 dark:text-gray-400"></div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+        
+        // --- Setup Theme ---
+        const themeToggle = document.getElementById('theme-toggle');
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else { document.documentElement.classList.remove('dark'); }
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        });
+
+        // --- Data & State ---
+        // 5 Processes, 3 Resources (A, B, C)
+        const PROCESS_COUNT = 5;
+        let processes = [];
+        let work = [0, 0, 0];
+        let finish = [];
+        let safeSeq = [];
+        let isRunning = false;
+
+        // Default Data (Standard Textbook Example)
+        // P0: Alloc(0,1,0) Max(7,5,3)
+        // P1: Alloc(2,0,0) Max(3,2,2)
+        // P2: Alloc(3,0,2) Max(9,0,2)
+        // P3: Alloc(2,1,1) Max(2,2,2)
+        // P4: Alloc(0,0,2) Max(4,3,3)
+        const defaults = {
+            alloc: [
+                [0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]
+            ],
+            max: [
+                [7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]
+            ],
+            avail: [3, 3, 2]
+        };
+
+        function initTable() {
+            const tbody = document.getElementById('matrix-body');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i < PROCESS_COUNT; i++) {
+                const tr = document.createElement('tr');
+                tr.id = `proc-row-${i}`;
+                tr.className = 'process-row border-b border-gray-50 dark:border-gray-800';
+                
+                tr.innerHTML = `
+                    <td class="p-2 font-bold text-gray-700 dark:text-gray-300">P${i}</td>
+                    <!-- Alloc -->
+                    <td class="p-1 text-center"><input type="number" id="alloc-${i}-0" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <td class="p-1 text-center"><input type="number" id="alloc-${i}-1" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <td class="p-1 text-center border-r dark:border-gray-700"><input type="number" id="alloc-${i}-2" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <!-- Max -->
+                    <td class="p-1 text-center"><input type="number" id="max-${i}-0" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <td class="p-1 text-center"><input type="number" id="max-${i}-1" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <td class="p-1 text-center border-r dark:border-gray-700"><input type="number" id="max-${i}-2" class="matrix-input" value="0" onchange="updateNeed(${i})"></td>
+                    <!-- Need (Read Only) -->
+                    <td class="p-1 text-center font-mono text-gray-500 dark:text-gray-400" id="need-${i}-0">0</td>
+                    <td class="p-1 text-center font-mono text-gray-500 dark:text-gray-400" id="need-${i}-1">0</td>
+                    <td class="p-1 text-center font-mono text-gray-500 dark:text-gray-400" id="need-${i}-2">0</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        function loadExample() {
+            // Set Avail
+            document.getElementById('avail-A').value = defaults.avail[0];
+            document.getElementById('avail-B').value = defaults.avail[1];
+            document.getElementById('avail-C').value = defaults.avail[2];
+
+            for(let i=0; i<PROCESS_COUNT; i++) {
+                // Set Alloc
+                document.getElementById(`alloc-${i}-0`).value = defaults.alloc[i][0];
+                document.getElementById(`alloc-${i}-1`).value = defaults.alloc[i][1];
+                document.getElementById(`alloc-${i}-2`).value = defaults.alloc[i][2];
+                // Set Max
+                document.getElementById(`max-${i}-0`).value = defaults.max[i][0];
+                document.getElementById(`max-${i}-1`).value = defaults.max[i][1];
+                document.getElementById(`max-${i}-2`).value = defaults.max[i][2];
+                
+                updateNeed(i);
+            }
+            
+            // Reset Visuals
+            resetVisuals();
+            log("Example loaded.", "text-blue-500");
+        }
+
+        function updateNeed(rowIdx) {
+            const alloc = [
+                parseInt(document.getElementById(`alloc-${rowIdx}-0`).value) || 0,
+                parseInt(document.getElementById(`alloc-${rowIdx}-1`).value) || 0,
+                parseInt(document.getElementById(`alloc-${rowIdx}-2`).value) || 0
+            ];
+            const max = [
+                parseInt(document.getElementById(`max-${rowIdx}-0`).value) || 0,
+                parseInt(document.getElementById(`max-${rowIdx}-1`).value) || 0,
+                parseInt(document.getElementById(`max-${rowIdx}-2`).value) || 0
+            ];
+
+            for(let j=0; j<3; j++) {
+                const needVal = Math.max(0, max[j] - alloc[j]);
+                document.getElementById(`need-${rowIdx}-${j}`).innerText = needVal;
+            }
+        }
+
+        function resetVisuals() {
+            isRunning = false;
+            safeSeq = [];
+            finish = new Array(PROCESS_COUNT).fill(false);
+            
+            // Clear styles
+            for(let i=0; i<PROCESS_COUNT; i++) {
+                const row = document.getElementById(`proc-row-${i}`);
+                row.className = 'process-row border-b border-gray-50 dark:border-gray-800';
+            }
+            
+            // Reset Work Display
+            const aA = document.getElementById('avail-A').value;
+            const aB = document.getElementById('avail-B').value;
+            const aC = document.getElementById('avail-C').value;
+            updateWorkDisplay(aA, aB, aC);
+
+            document.getElementById('safe-sequence-container').innerHTML = '<span class="text-sm text-gray-400 italic" id="safe-seq-placeholder">None yet</span>';
+            document.getElementById('final-result').className = 'mt-4 font-bold text-center hidden';
+            document.getElementById('simulation-status').innerHTML = '<div class="text-center text-gray-400 py-8">Ready to start simulation...</div>';
+            document.getElementById('activity-log').innerHTML = '';
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('run-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function updateWorkDisplay(a, b, c) {
+            document.getElementById('work-A').innerText = a;
+            document.getElementById('work-B').innerText = b;
+            document.getElementById('work-C').innerText = c;
+        }
+
+        function log(msg, colorClass = "text-gray-600 dark:text-gray-400") {
+            const logDiv = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = colorClass;
+            entry.innerHTML = `<span class="opacity-50 mr-2">[${new Date().toLocaleTimeString().split(' ')[0]}]</span>${msg}`;
+            logDiv.prepend(entry);
+        }
+
+        async function runAlgorithm() {
+            if (isRunning) return;
+            resetVisuals();
+            isRunning = true;
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('run-btn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Read Current State
+            let alloc = [], max = [], need = [];
+            for(let i=0; i<PROCESS_COUNT; i++) {
+                let aRow = [], mRow = [], nRow = [];
+                for(let j=0; j<3; j++) {
+                    aRow.push(parseInt(document.getElementById(`alloc-${i}-${j}`).value) || 0);
+                    mRow.push(parseInt(document.getElementById(`max-${i}-${j}`).value) || 0);
+                    nRow.push(parseInt(document.getElementById(`need-${i}-${j}`).innerText) || 0);
+                }
+                alloc.push(aRow);
+                max.push(mRow);
+                need.push(nRow);
+            }
+
+            // Init Work
+            work = [
+                parseInt(document.getElementById('avail-A').value) || 0,
+                parseInt(document.getElementById('avail-B').value) || 0,
+                parseInt(document.getElementById('avail-C').value) || 0
+            ];
+            
+            updateWorkDisplay(work[0], work[1], work[2]);
+            log("Algorithm Started. Work initialized from Available.", "font-bold text-gray-800 dark:text-white");
+
+            let count = 0;
+            while (count < PROCESS_COUNT) {
+                let found = false;
+                
+                for (let i = 0; i < PROCESS_COUNT; i++) {
+                    if (!finish[i]) {
+                        // Highlight Checking
+                        const row = document.getElementById(`proc-row-${i}`);
+                        row.classList.add('active-check');
+                        
+                        document.getElementById('simulation-status').innerHTML = `
+                            <div class="text-center">
+                                <p class="font-bold text-lg mb-2">Checking P${i}...</p>
+                                <div class="inline-block bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm font-mono border border-gray-200 dark:border-gray-700">
+                                    Need: (${need[i]}) ≤ Work: (${work})?
+                                </div>
+                            </div>
+                        `;
+                        
+                        await new Promise(r => setTimeout(r, 1000));
+
+                        // Check condition
+                        if (need[i][0] <= work[0] && need[i][1] <= work[1] && need[i][2] <= work[2]) {
+                            log(`P${i} can be allocated! Need(${need[i]}) <= Work(${work})`, "text-green-600 dark:text-green-400");
+                            
+                            // Visualize Allocation
+                            work[0] += alloc[i][0];
+                            work[1] += alloc[i][1];
+                            work[2] += alloc[i][2];
+                            
+                            safeSeq.push(i);
+                            finish[i] = true;
+                            found = true;
+                            count++;
+                            
+                            // UI Updates
+                            row.classList.remove('active-check');
+                            row.classList.add('safe');
+                            
+                            updateWorkDisplay(work[0], work[1], work[2]);
+                            
+                            // Add to sequence list
+                            const seqContainer = document.getElementById('safe-sequence-container');
+                            const placeholder = document.getElementById('safe-seq-placeholder');
+                            if(placeholder) placeholder.remove();
+                            
+                            const badge = document.createElement('span');
+                            badge.className = "inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 font-bold border border-green-200 dark:border-green-800 shadow-sm animate-bounce";
+                            badge.innerText = `P${i}`;
+                            seqContainer.appendChild(badge);
+                            
+                            document.getElementById('simulation-status').innerHTML = `
+                                <div class="text-center text-green-600 dark:text-green-400">
+                                    <p class="font-bold">P${i} Finished!</p>
+                                    <p class="text-xs text-gray-500">Resources released. Work updated.</p>
+                                </div>
+                            `;
+                            
+                            await new Promise(r => setTimeout(r, 1000));
+                            break; // Restart loop to find next
+                        } else {
+                            log(`P${i} must wait. Need(${need[i]}) > Work(${work})`, "text-yellow-600 dark:text-yellow-500");
+                            row.classList.remove('active-check');
+                            // row.classList.add('unsafe'); // Temporary unsafe visual?
+                            // setTimeout(() => row.classList.remove('unsafe'), 500);
+                        }
+                    }
+                }
+
+                if (!found) {
+                    break; // Deadlock
+                }
+            }
+
+            const resultDiv = document.getElementById('final-result');
+            resultDiv.classList.remove('hidden');
+            
+            if (count < PROCESS_COUNT) {
+                resultDiv.innerHTML = `<span class="text-red-600 text-xl">DEADLOCK DETECTED!</span><br><span class="text-sm font-normal text-gray-500">System is in an unsafe state.</span>`;
+                log("Algorithm finished. System is UNSAFE.", "font-bold text-red-600");
+            } else {
+                resultDiv.innerHTML = `<span class="text-green-600 text-xl">SAFE SEQUENCE FOUND!</span><br><span class="text-sm font-normal text-gray-500">System is in a safe state.</span>`;
+                log("Algorithm finished. System is SAFE.", "font-bold text-green-600");
+            }
+            
+            isRunning = false;
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('run-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Init
+        initTable();
+        loadExample();
+
+    </script>
+</body>
+</html>
